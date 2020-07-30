@@ -1,36 +1,41 @@
 # Synopsys Import Yocto Build Manifest - import_yocto_bm.py
-#OVERVIEW
+
+# OVERVIEW
 This script is provided under an OSS license as an example of how to use the Black Duck APIs to import components from a manifest list.
 
 It does not represent any extension of licensed functionality of Synopsys software itself and is provided as-is, without warranty or liability.
 
-#DESCRIPTION
+# DESCRIPTION
 
-The `import_yocto_bm.py` script is designed to import a Yocto project build manifest created by Bitbake.
+The `import_yocto_bm.py` script is designed to import a Yocto project build manifest created by Bitbake. It replaces previous scripts (including https://github.com/matthewb66/import_yocto_build_manifest).
 
 It must be executed on a Linux workstation where Yocto has been installed and after a successful Bitbake build.
 
-If invoked in the Yocto top level folder for a build (or the folder is specified using the -y option), then it will locate the build-manifest file automatically in the build/tmp hierarchy.
+If invoked in the Yocto build folder (or the build folder is manually specified using the -y option), then it will locate the build-manifest file automatically in the tmp/deploy hierarchy.
 
-If the build has been performed with the Yocto cve\_check class configured, then the script will also optionally locate the CVE list identified by cve\_check to set the remediation status of the locally patched CVEs in the Black Duck project.
+If the Bitbake build was performed with the Yocto `cve_check` class configured, then the script will also optionally locate the CVE log exported by CVE check, extract patched CVEs and set the remediation status of matching CVEs in the Black Duck project.
 
-It requires access to the Black Duck server via the API (see Prerequisites below) unless an option is used to create the output scan file for manual upload.
+It requires access to the Black Duck server via the API (see Prerequisites below) unless the -o option is used to create the output scan file for manual upload.
 
-#PREREQUISITES
+# PREREQUISITES
 
-Python 3 and the Black Duck https://github.com/blackducksoftware/hub-rest-api-python package must be installed prior to using this script.
+1. Python 3 must be installed.
 
-An API key for the Black Duck server must also be configured in the `.restconfig.json` file, and the Yocto environment must be loaded to the current shell (see [Preconfiguration](#PRECONFIGURATION) section below).
+1. The Black Duck https://github.com/blackducksoftware/hub-rest-api-python package must be installed prior to using this script. Use the following command to install the hub-rest-api-python package:
 
-The Yocto project must have been pre-built.
+	pip install blackduck
 
-For patched CVE remediation in the Black Duck project, you will need to add the `cve_check` bbclass to the Yocto build configuration to generate the CVE check log output. Add the following line to the `build/conf/local.conf` file:
+1. An API key for the Black Duck server must also be configured in the `.restconfig.json` file, and the Yocto environment must be loaded to the current shell (see [Preconfiguration](#PRECONFIGURATION) section below).
+
+1. The Yocto project must have been pre-built.
+
+1. For patched CVE remediation in the Black Duck project, you will need to add the `cve_check` bbclass to the Yocto build configuration to generate the CVE check log output. Add the following line to the `build/conf/local.conf` file:
 
 		INHERIT += "cve-check"
 
 Then use the Yocto build command (e.g. `bitbake core-image-sato` which will incrementally build without needing to rerun the full build, but will add the CVE check action to generate the log files.
 
-#INSTALLATION
+# INSTALLATION
 
 Change to a chosen location and use Git to download a copy of the project:
 
@@ -41,38 +46,38 @@ Change to a chosen location and use Git to download a copy of the project:
 
 The `import_yocto_bm.py` usage is shown below:
 
-		usage: import_yocto_bm [-h] [-p PROJECT] [-v VERSION] [-y YOCTO_FOLDER]
-							   [-t TARGET] [-o OUTPUT_JSON] [-m MANIFEST]
-							   [--arch ARCH] [--cve_check_only] [--no_cve_check]
-							   [--cve_check_file CVE_CHECK_FILE]
+	usage: import_yocto_bm [-h] [-p PROJECT] [-v VERSION] [-y YOCTO_FOLDER]
+						   [-t TARGET] [-o OUTPUT_JSON] [-m MANIFEST]
+						   [--arch ARCH] [--cve_check_only] [--no_cve_check]
+						   [--cve_check_file CVE_CHECK_FILE]
 
-		Import Yocto build manifest to BD project version
+	Import Yocto build manifest to BD project version
 
-		optional arguments:
-		  -h, --help            show this help message and exit
-		  -p PROJECT, --project PROJECT
-								Black Duck project to create (REQUIRED)
-		  -v VERSION, --version VERSION
-								Black Duck project version to create (REQUIRED)
-		  -y YOCTO_FOLDER, --yocto_build_folder YOCTO_FOLDER
-								Yocto build folder (required if CVE check required or
-								manifest file not specified)
-		  -o OUTPUT_JSON, --output_json OUTPUT_JSON
-								Output JSON bom file for manual import to Black Duck
-								(instead of uploading the scan automatically)
-		  -t TARGET, --target TARGET
-								Yocto target (default core-poky-sato)
-		  -m MANIFEST, --manifest MANIFEST
-								Input build manifest file (if not specified will be
-								determined from conf files)
-		  --arch ARCH           Architecture (if not specified then will be determined
-								from conf files)
-		  --cve_check_only      Only check for patched CVEs from cve_check and update
-								existing project
-		  --no_cve_check        Skip check for and update of patched CVEs
-		  --cve_check_file CVE_CHECK_FILE
-								CVE check output file (if not specified will be
-								determined from conf files)
+	optional arguments:
+	  -h, --help            show this help message and exit
+	  -p PROJECT, --project PROJECT
+				Black Duck project to create (REQUIRED)
+	  -v VERSION, --version VERSION
+				Black Duck project version to create (REQUIRED)
+	  -y YOCTO_FOLDER, --yocto_build_folder YOCTO_FOLDER
+	  			Yocto build folder (required if CVE check required or
+				manifest file not specified)
+	  -o OUTPUT_JSON, --output_json OUTPUT_JSON
+				Output JSON bom file for manual import to Black Duck
+				(instead of uploading the scan automatically)
+	  -t TARGET, --target TARGET
+				Yocto target (default core-poky-sato)
+	  -m MANIFEST, --manifest MANIFEST
+				Input build manifest file (if not specified will be
+				determined from conf files)
+	  --arch ARCH           Architecture (if not specified then will be determined
+				from conf files)
+	  --cve_check_only      Only check for patched CVEs from cve_check and update
+				existing project
+	  --no_cve_check        Skip check for and update of patched CVEs
+	  --cve_check_file CVE_CHECK_FILE
+				CVE check output file (if not specified will be
+				determined from conf files)
 
 The script will use the invocation folder as the Yocto top-level folder by default (if there is a `poky` sub-folder then it will be used instead). The `--yocto_folder` option can be used to specify the Yocto top-level folder as opposed to the invocation folder.
 
@@ -90,7 +95,7 @@ Use the `--cve_check_only` option to skip the scanning of the project and creati
 
 Use the `--no_cve_check` option to skip the patched CVE identification and update of the Black Duck project. 
 
-#PRECONFIGURATION
+# PRECONFIGURATION
 
 You will need to run the following commands (change the location as required):
 
@@ -132,3 +137,10 @@ To create a JSON output scan without uploading (and no CVE patch update) use:
 
     python3 $YOCTO_BM_LOC/import_yocto_bm.py -p myproject -v v1.0 -o my.jsonld
 
+# CVEs from cve_check Versus Black Duck
+
+The Yocto `cve_check` class works on the Bitbake dependencies within the dev environment, and produces a list of CVEs identified from the NVD for ALL packages in the development environment.
+
+This script extracts the packages from the build manifest (which will be a subset of those in the full Bitbake dependencies for build environment) and creates a Black Duck project.
+
+The list of CVEs reported by `cve_check` will therefore be considerably larger than seen in the Black Duck project (whcih is the expected situation).
