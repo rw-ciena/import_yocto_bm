@@ -23,11 +23,13 @@ It requires access to the Black Duck server via the API (see Prerequisites below
 
 1. Python 3 must be installed.
 
-1. The Black Duck https://github.com/blackducksoftware/hub-rest-api-python package must be installed prior to using this script. Use the following command to install the hub-rest-api-python package:
+1. The Black Duck https://github.com/blackducksoftware/hub-rest-api-python package must be installed. Use the following command to install the hub-rest-api-python package:
 
        pip install blackduck
 
-1. An API key for the Black Duck server must also be configured in the `.restconfig.json` file, and the Yocto environment must be loaded to the current shell (see [Preconfiguration](#PRECONFIGURATION) section below).
+1. An API key for the Black Duck server must be configured in the `.restconfig.json` file in the script invocation folder.
+
+1. The Yocto environment must be loaded to the current shell (see [Preconfiguration](#PRECONFIGURATION) section below).
 
 1. The Yocto project must have been pre-built.
 
@@ -104,7 +106,9 @@ You will need to run the following commands (change the location as required):
     cd /home/users/myuser/yocto_zeus/poky
     source oe-init-build-env
 
-This will change directory into the Yocto build sub-folder; you will need to create the `.restconfig.json` file in the current folder, for example:
+The `oe-init-build-env` script will change directory into the Yocto build sub-folder.
+
+A `.restconfig.json` file must be created within the build folder: example `.restconfig.json` file:
 
     {
       "baseurl": "https://SERVER_URL",
@@ -117,7 +121,7 @@ Where `SERVER_URL` is the Black Duck server URL and `TOKEN` is the Black Duck AP
 
 # EXAMPLE USAGE
 
-Check the [Configuration](#PRECONFIGURATION) section above before running the script.
+Check the [Preconfiguration](#PRECONFIGURATION) section above before running the script.
 
 Use the following command to scan a Yocto build, create Black Duck project `myproject` and version `v1.0`, then update CVE patch status for identified CVEs:
 
