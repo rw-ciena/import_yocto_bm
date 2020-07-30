@@ -146,3 +146,7 @@ The Yocto `cve_check` class works on the Bitbake dependencies within the dev env
 This script extracts the packages from the build manifest (which will be a subset of those in the full Bitbake dependencies for build environment) and creates a Black Duck project.
 
 The list of CVEs reported by `cve_check` will therefore be considerably larger than seen in the Black Duck project (whcih is the expected situation).
+
+# OUTSTANDING ISSUES
+
+The identification of the Linux Kernel version from the Bitbake recipes and association with the upstream component in the KB has not been completed yet. Until an automatic identification is possible, the required Linux Kernel component can be added manually to the Black Duck project.
