@@ -19,11 +19,13 @@ It requires access to the Black Duck server via the API (see Prerequisites below
 
 # PREREQUISITES
 
+1. Must be run on Linux
+
 1. Python 3 must be installed.
 
 1. The Black Duck https://github.com/blackducksoftware/hub-rest-api-python package must be installed prior to using this script. Use the following command to install the hub-rest-api-python package:
 
-	pip install blackduck
+		pip install blackduck
 
 1. An API key for the Black Duck server must also be configured in the `.restconfig.json` file, and the Yocto environment must be loaded to the current shell (see [Preconfiguration](#PRECONFIGURATION) section below).
 
