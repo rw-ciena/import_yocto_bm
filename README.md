@@ -83,21 +83,21 @@ The `import_yocto_bm.py` usage is shown below:
 				CVE check output file (if not specified will be
 				determined from conf files)
 
-The script will use the invocation folder as the Yocto top-level folder by default (if there is a `poky` sub-folder then it will be used instead). The `--yocto_folder` option can be used to specify the Yocto top-level folder as opposed to the invocation folder.
+The script will use the invocation folder as the Yocto build folder (e.g. yocto_zeus/poky/build) by default (if there is a `build` sub-folder then it will be used instead). The `--yocto_folder` option can be used to specify the Yocto build folder as opposed to the invocation folder.
 
 The `--project` and `--version` options are required to define the Black Duck project and version names for inclusion in the json output file (and update CVE patch status).
 
 The `--output_json` option can be used to specify an output file for the project scan. If specified, then the scan will not be uploaded automatically and CVE patch checking will be skipped.
 
-The Yocto target name is required to locate the manifest and cve\_check log files and will be extracted from the Bitbake config files automatically, but the `--target` option can be used to specify manually.
+The Yocto target and architecture values are required to locate the manifest and cve\_check log files and will be extracted from the Bitbake config files automatically, but the `--target` and `--arch` options can be used to specify these manually.
 
 The most recent Bitbake output manifest file (located in the `build/tmp/deploy/licenses/<image>-<target>-<datetime>/package.manifest` file) will be located automatically. Use the `--manifest` option to specify the manifest file manually.
 
-The most recent cve\_check log file in the location  `build/tmp/deploy/images/<arch>/<image>-<target>-<datetime>.rootfs.cve` will be located automatically if it exists. Use the `--cve_check_file` option to specify the cve\_check log file manually.
+The most recent cve\_check log file `build/tmp/deploy/images/<arch>/<image>-<target>-<datetime>.rootfs.cve` will be located automatically if it exists. Use the `--cve_check_file` option to specify the cve\_check log file location manually (for example to use an older copy).
 
-Use the `--cve_check_only` option to skip the scanning of the project and creation of a project, only looking for a CVE check output log file to identify and patch CVEs within an existing Black Duck project.
+Use the `--cve_check_only` option to skip the scanning of the project and creation of a project, only looking for a CVE check output log file to identify and patching matched CVEs within an existing Black Duck project (which must have been created previously).
 
-Use the `--no_cve_check` option to skip the patched CVE identification and update of the Black Duck project. 
+Use the `--no_cve_check` option to skip the patched CVE identification and update of CVE status in the Black Duck project. 
 
 # PRECONFIGURATION
 
