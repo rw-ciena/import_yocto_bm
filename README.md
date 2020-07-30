@@ -25,7 +25,7 @@ It requires access to the Black Duck server via the API (see Prerequisites below
 
 1. The Black Duck https://github.com/blackducksoftware/hub-rest-api-python package must be installed prior to using this script. Use the following command to install the hub-rest-api-python package:
 
-		pip install blackduck
+       pip install blackduck
 
 1. An API key for the Black Duck server must also be configured in the `.restconfig.json` file, and the Yocto environment must be loaded to the current shell (see [Preconfiguration](#PRECONFIGURATION) section below).
 
@@ -33,7 +33,7 @@ It requires access to the Black Duck server via the API (see Prerequisites below
 
 1. For patched CVE remediation in the Black Duck project, you will need to add the `cve_check` bbclass to the Yocto build configuration to generate the CVE check log output. Add the following line to the `build/conf/local.conf` file:
 
-		INHERIT += "cve-check"
+       INHERIT += "cve-check"
 
 Then use the Yocto build command (e.g. `bitbake core-image-sato` which will incrementally build without needing to rerun the full build, but will add the CVE check action to generate the log files.
 
@@ -41,8 +41,8 @@ Then use the Yocto build command (e.g. `bitbake core-image-sato` which will incr
 
 Change to a chosen location and use Git to download a copy of the project:
 
-		git clone https://github.com/matthewb66/import_yocto_bm
-		export YOCTO_BM_LOC=`pwd`/import_yocto_bm
+    git clone https://github.com/matthewb66/import_yocto_bm
+    export YOCTO_BM_LOC=`pwd`/import_yocto_bm
 
 # STANDARD USAGE
 
@@ -106,12 +106,12 @@ You will need to run the following commands (change the location as required):
 
 This will change directory into the Yocto build sub-folder; you will need to create the `.restconfig.json` file in the current folder, for example:
 
-		{
-		  "baseurl": "https://SERVER_URL",
-		  "api_token": "TOKEN",
-		  "insecure": true,
-		  "debug": false
-		}
+    {
+      "baseurl": "https://SERVER_URL",
+      "api_token": "TOKEN",
+      "insecure": true,
+      "debug": false
+    }
 
 Where `SERVER_URL` is the Black Duck server URL and `TOKEN` is the Black Duck API token.
 
