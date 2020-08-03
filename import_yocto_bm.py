@@ -82,7 +82,7 @@ def check_yocto_build_folder():
 	global args
 	# check Yocto build dir:
 	#yocto_build_folders = [ "build", "meta", "bitbake" ]
-	yocto_build_folders = [ "conf", "cache", "workspace" ]
+	yocto_build_folders = [ "conf", "cache", "tmp" ]
 	yocto_files = [ ]
 
 	if os.path.isdir(os.path.join(args.yocto_build_folder, "build")):
@@ -247,7 +247,10 @@ def proc_layers_in_recipes():
 	start = False
 	for line in lines:
 		if start:
-			if rec != "":
+			if line.endswith(":"):
+				arr = line.split(":")
+				rec = arr[0]
+			else:
 				arr = line.split()
 				if len(arr) > 1:
 					layer = arr[0]
@@ -256,9 +259,6 @@ def proc_layers_in_recipes():
 					if layer not in layers:
 						layers.append(layer)
 				rec = ""
-			else:
-				arr = line.split(":")
-				rec = arr[0]
 		elif line.find("=== Matching recipes: ===") != -1:
 			start = True
 	print("- Discovered {} layers".format(len(layers)))
@@ -384,6 +384,14 @@ def write_bdio(bdio):
 			return(False)
 
 	return(True)
+
+def upload_json(jsonfile):
+	hub = HubInstance()
+	r = hub.upload_scan(jsonfile)
+	if r.status_code == 201:
+		return(True)
+	else:
+		return(False)
 
 if not args.cve_check_only:
 	try:
