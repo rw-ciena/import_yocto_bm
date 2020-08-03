@@ -11,7 +11,8 @@ import time
 from blackduck.HubRestApi import HubInstance
 
 u = uuid.uuid1()
-print("Yocto build manifest import into Black Duck Utility v1.0\n")
+print("Yocto build manifest import into Black Duck Utility v1.1")
+print("--------------------------------------------------------\n")
 
 parser = argparse.ArgumentParser(description='Import Yocto build manifest to BD project version', prog='import_yocto_bm')
 
@@ -205,55 +206,43 @@ if args.manifest == "":
 if not check_args() or not check_env() or not find_files():
 	sys.exit(1)
 
-def upload_json(jsonfile):
-	hub = HubInstance()
-	r = hub.upload_scan(jsonfile)
-	if r.status_code == 201:
-		return(True)
-	else:
-		return(False)
-
 bdio = []
 proj = args.project
 ver = args.version
 comps_layers = []
 comps_recipes = []
-if not args.cve_check_only:
-	try:
-		i = open(args.manifest, "r")
-	except Exception as e:
-		print('ERROR: Unable to open input manifest file {}\n'.format(args.manifest) + str(e))
-		sys.exit(3)
+packages = []
+recipes = {}
 
-	try:
-		liclines = i.readlines()
-		i.close()
-	except Exception as e:
-		print('ERROR: Unable to read license.manifest file {} \n'.format(args.manifest) + str(e))
-		sys.exit(3)
+def proc_license_manifest(liclines):
+	global recipes, packages
 
-	print("\nProcessing recipes from license.manifest: ...")
-	recipes = {}
+	print("- Working on recipes from license.manifest: ...")
 	entries = 0
 	for line in liclines:
 		arr = line.split(":")
 		if len(arr) > 1:
 			key = arr[0]
 			value = arr[1].strip()
-			if key == "PACKAGE VERSION":
+			if key == "PACKAGE NAME":
+				packages.append(value)
+			elif key == "PACKAGE VERSION":
 				ver = value
 			elif key == "RECIPE NAME":
 				entries += 1
 				if not value in recipes.keys():
 					recipes[value] = ver
-	print("Identified {} recipes from {} packages".format(len(recipes), entries))
+	print("- Identified {} recipes from {} packages".format(len(recipes), entries))
 
-	print("Identifying layers for recipes ...")
+recipe_layer = {}
+layers = []
+def proc_layers_in_recipes():
+	global layers, recipe_layer
+
+	print("- Identifying layers for recipes ...")
 	output = subprocess.check_output(['bitbake-layers', 'show-recipes', '*'], stderr=subprocess.STDOUT)
 	mystr = output.decode("utf-8").strip()
 	lines = mystr.splitlines()
-	recipe_layer = {}
-	layers = []
 	rec = ""
 	start = False
 	for line in lines:
@@ -272,9 +261,12 @@ if not args.cve_check_only:
 				rec = arr[0]
 		elif line.find("=== Matching recipes: ===") != -1:
 			start = True
-	print("Discovered {} layers".format(len(layers)))
+	print("- Discovered {} layers".format(len(layers)))
 
-	print("Identifying recipe revisions: ...")
+def proc_recipe_revisions():
+	global licdir, recipes
+
+	print("- Identifying recipe revisions: ...")
 	for recipe in recipes.keys():
 		recipeinfo = os.path.join(licdir, recipe, "recipeinfo")
 		if os.path.isfile(recipeinfo):
@@ -291,10 +283,13 @@ if not args.cve_check_only:
 					rev = arr[1].strip()
 					recipes[recipe] += "-" + rev
 
-	print("Processing layers: ...")
+proj_rel = []
+comps_layers = []
+def proc_layers():
+	global proj_rel, comps_layers, layers, recipes, recipe_layer
+
+	print("- Processing layers: ...")
 	#proj_rel is for the project relationship (project to layers)
-	proj_rel = []
-	comps_layers = []
 	for layer in layers:
 		proj_rel.append(
 			{
@@ -335,8 +330,11 @@ if not args.cve_check_only:
 		    "relationship": layer_rel
 		})
 
-	print("Processing recipes: ...")
-	comps_recipes = []
+comps_recipes = []
+def proc_recipes():
+	global recipes, recipe_layer, comps_recipes
+
+	print("- Processing recipes: ...")
 	for recipe in recipes.keys():
 		comps_recipes.append(
 		{
@@ -360,6 +358,53 @@ if not args.cve_check_only:
 		    },
 		    "relationship": []
 		  })
+
+def write_bdio(bdio):
+	global args
+
+	if args.output_json != "":
+		try:
+			o = open(args.output_json, "w")
+			o.write(json.dumps(bdio, indent=4))
+			o.close()
+			print("Json project file written to {} - must be manually uploaded".format(args.output_json))
+		except Exception as e:
+			print("ERROR: Unable to write output json file {}\n".format(args.output_json) + str(e))
+			return(False)
+
+	else:
+		import tempfile
+		try:
+			with tempfile.NamedTemporaryFile(suffix=".jsonld", delete=False) as o:
+				args.output_json = o.name
+				o.write(json.dumps(bdio, indent=4).encode())
+				o.close()
+		except Exception as e:
+			print("ERROR: Unable to write temporary output json file\n" + str(e))
+			return(False)
+
+	return(True)
+
+if not args.cve_check_only:
+	try:
+		i = open(args.manifest, "r")
+	except Exception as e:
+		print('ERROR: Unable to open input manifest file {}\n'.format(args.manifest) + str(e))
+		sys.exit(3)
+
+	try:
+		liclines = i.readlines()
+		i.close()
+	except Exception as e:
+		print('ERROR: Unable to read license.manifest file {} \n'.format(args.manifest) + str(e))
+		sys.exit(3)
+
+	print("\nProcessing:")
+	proc_license_manifest(liclines)
+	proc_layers_in_recipes()
+	proc_recipe_revisions()
+	proc_layers()
+	proc_recipes()
 
 	#proj_rel is for the project relationship (project to layers)
 
@@ -403,28 +448,9 @@ if not args.cve_check_only:
 	    "relationship": proj_rel
 	  }
 
-	#print("Writing json output file {} ...".format(args.output_json))
-
 	bdio = [ bdio_header, bdio_project, comps_layers, comps_recipes ]
-	if args.output_json != "":
-		try:
-			o = open(args.output_json, "w")
-			o.write(json.dumps(bdio, indent=4))
-			o.close()
-			print("Json project file written to {} - must be manually uploaded".format(args.output_json))
-		except Exception as e:
-			print("ERROR: Unable to write output json file {}\n".format(args.output_json) + str(e))
-		sys.exit(1)
-	else:
-		import tempfile
-		try:
-			with tempfile.NamedTemporaryFile(suffix=".jsonld", delete=False) as o:
-				args.output_json = o.name
-				o.write(json.dumps(bdio, indent=4).encode())
-				o.close()
-		except Exception as e:
-			print("ERROR: Unable to write temporary output json file\n" + str(e))
-			sys.exit(3)
+	if not write_bdio(bdio):
+		sys.exit(3)
 
 	print("\nUploading scan to Black Duck server ...")
 	if upload_json(args.output_json):
@@ -433,8 +459,8 @@ if not args.cve_check_only:
 		print("ERROR: Unable to upload scan file")
 		sys.exit(3)
 
-
 def process_patched_cves(vuln_list):
+	global args
 	hub = HubInstance()
 
 	try:
@@ -469,7 +495,7 @@ def process_patched_cves(vuln_list):
 				#else:
 				#	print("Skipped {} (Component not in image)".format(vuln_name))
 
-		print("{} CVEs marked as patched in project '{}/{}'".format(count, args.project, args.version))
+		print("- {} CVEs marked as patched in project '{}/{}'".format(count, args.project, args.version))
 	except Exception as e:
 		print("ERROR: Unable to update vulnerabilities via API\n" + str(e))
 
@@ -505,7 +531,6 @@ def wait_for_bom_completion(ver):
 	else:
 		return(False)
 
-
 if args.cve_check_file != "" and not args.no_cve_check:
 	hub = HubInstance()
 
@@ -530,6 +555,7 @@ if args.cve_check_file != "" and not args.no_cve_check:
 	cvefile.close()
 	patched_vulns = []
 	pkgvuln = {}
+	cves_in_bm = 0
 	for line in cvelines:
 		arr = line.split(":")
 		if len(arr) > 1:
@@ -545,9 +571,12 @@ if args.cve_check_file != "" and not args.no_cve_check:
 				pkgvuln['status'] = value
 				if pkgvuln['status'] == "Patched":
 					patched_vulns.append(pkgvuln['CVE'])
+					if pkgvuln['package'] in packages:
+						cves_in_bm += 1
 				pkgvuln = {}
 
-	print("{} Patched CVEs identified from cve_check file".format(len(patched_vulns)))
+	print("CVEs identified from cve_check file:")
+	print("- {} Patched CVEs total".format(len(patched_vulns)))
+	print("- {} Patched CVEs within packages in manifest".format(cves_in_bm))
 	if len(patched_vulns) > 0:
 		process_patched_cves(patched_vulns)
-
