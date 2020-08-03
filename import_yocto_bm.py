@@ -508,15 +508,11 @@ def process_patched_cves(vuln_list):
 		print("ERROR: Unable to update vulnerabilities via API\n" + str(e))
 
 def wait_for_bom_completion(ver):
+	global hub
 	# Check job status
 	uptodate = False
 	try:
 		links = ver['_meta']['links']
-		#link = next((item for item in links if item["rel"] == "codelocations"), None)
-		#cl_url = link['href']
-		#custom_headers = {'Accept':'application/vnd.blackducksoftware.internal-1+json'}
-		#resp = hub.execute_get(cl_url, custom_headers=custom_headers)
-
 		link = next((item for item in links if item["rel"] == "bom-status"), None)
 
 		href = link['href']
@@ -539,21 +535,49 @@ def wait_for_bom_completion(ver):
 	else:
 		return(False)
 
+def wait_for_scans(ver):
+	global hub
+	links = ver['_meta']['links']
+	link = next((item for item in links if item["rel"] == "codelocations"), None)
+
+	href = link['href']
+
+	time.sleep(10)
+	wait = True
+	loop = 0
+	while wait and loop < 20:
+		custom_headers = {'Accept':'application/vnd.blackducksoftware.internal-1+json'}
+		resp = hub.execute_get(href, custom_headers=custom_headers)
+		for cl in resp.json()['items']:
+			if 'status' in cl:
+				status_list = cl['status']
+				for status in status_list:
+					if status['operationNameCode'] == "ServerScanning":
+						if status['status'] == "COMPLETED":
+							wait = False
+		if wait:
+			time.sleep(15)
+			loop += 1
+
+	return(not wait)
+
 if args.cve_check_file != "" and not args.no_cve_check:
 	hub = HubInstance()
 
 	print("Waiting for scan completion before continuing ...")
-	if not args.cve_check_only:
-		time.sleep(30)
 
 	try:
 		ver = hub.get_project_version_by_name(args.project, args.version)
 	except Exception as e:
 		print("ERROR: Unable to get project version from API\n" + str(e))
-		sys.exit(1)
+		sys.exit(3)
+
+	if not wait_for_scans(ver):
+		print("ERROR: Unable to determine scan status")
+		sys.exit(3)
 
 	if not wait_for_bom_completion(ver):
-		print("ERROR: Unable to determine BOM status - exiting")
+		print("ERROR: Unable to determine BOM status")
 		sys.exit(3)
 
 	print("\nLoading CVEs from cve_check log ...")
