@@ -1,7 +1,7 @@
 # Synopsys Import Yocto Build Manifest - import_yocto_bm.py
 
 # OVERVIEW
-This script is provided under an OSS license as an example of how to use the Black Duck APIs to import components from a manifest list.
+This script is provided under an OSS license as an example of how to use the Black Duck APIs to import components from a Yocto project manifest.
 
 It does not represent any extension of licensed functionality of Synopsys software itself and is provided as-is, without warranty or liability.
 
@@ -9,13 +9,19 @@ It does not represent any extension of licensed functionality of Synopsys softwa
 
 The `import_yocto_bm.py` script is designed to import a Yocto project build manifest created by Bitbake. It replaces previous scripts (including https://github.com/matthewb66/import_yocto_build_manifest).
 
-It must be executed on a Linux workstation where Yocto has been installed and after a successful Bitbake build.
+The script must be executed on a Linux workstation where Yocto has been installed and after a successful Bitbake build.
 
 If invoked in the Yocto build folder (or the build folder is manually specified using the -y option), then it will locate the build-manifest file automatically in the tmp/deploy hierarchy.
 
 If the Bitbake build was performed with the Yocto `cve_check` class configured, then the script will also optionally locate the CVE log exported by CVE check, extract patched CVEs and set the remediation status of matching CVEs in the Black Duck project.
 
 It requires access to the Black Duck server via the API (see Prerequisites below) unless the -o option is used to create the output scan file for manual upload.
+
+# SUPPORTED YOCTO PROJECTS
+
+This script is designed to support Yocto versions 2.0 up to 3.1 for building projects.
+
+OSS components from OpenEmbedded recipes maintained at layers.openbedded.org should be detected by the scan. Additional OSS components managed by custom recipes will not be detected.
 
 # PREREQUISITES
 
@@ -29,7 +35,7 @@ It requires access to the Black Duck server via the API (see Prerequisites below
 
 1. An API key for the Black Duck server must be configured in the `.restconfig.json` file in the script invocation folder.
 
-1. The Yocto environment must be loaded to the current shell (see [Preconfiguration](#PRECONFIGURATION) section below).
+1. A supported Yocto environment (version 2.0 to 3.1) must be loaded to the current shell (see [Preconfiguration](#PRECONFIGURATION) section below).
 
 1. The Yocto project must have been pre-built.
 
