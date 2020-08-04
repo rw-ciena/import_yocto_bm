@@ -11,7 +11,7 @@ import time
 from blackduck.HubRestApi import HubInstance
 
 u = uuid.uuid1()
-print("Yocto build manifest import into Black Duck Utility v1.1")
+print("Yocto build manifest import into Black Duck Utility v1.2")
 print("--------------------------------------------------------\n")
 
 parser = argparse.ArgumentParser(description='Import Yocto build manifest to BD project version', prog='import_yocto_bm')
@@ -256,6 +256,7 @@ def proc_layers_in_recipes():
 					layer = arr[0]
 					ver = arr[1]
 					recipe_layer[rec] = layer
+					recipes[rec] = ver
 					if layer not in layers:
 						layers.append(layer)
 				rec = ""
@@ -300,9 +301,14 @@ def proc_layers():
 		layer_rel = []
 		for recipe in recipes.keys():
 			if recipe_layer[recipe] == layer:
+				if recipes[recipe].find("+gitAUTOINC") != -1:
+					ver = recipes[recipe].split("+")[0] + "+GitX-" + recipes[recipe].split("-")[-1]
+				else:
+					ver = recipes[recipe]
+					
 				layer_rel.append(
 					{
-						"related": "http:yocto/" + layer + "/" + recipe + "/" + recipes[recipe],
+						"related": "http:yocto/" + layer + "/" + recipe + "/" + ver,
 						"relationshipType": "DYNAMIC_LINK"
 					}
 				)
@@ -336,13 +342,18 @@ def proc_recipes():
 
 	print("- Processing recipes: ...")
 	for recipe in recipes.keys():
+		if recipes[recipe].find("+gitAUTOINC") != -1:
+			ver = recipes[recipe].split("+")[0] + "+GitX-" + recipes[recipe].split("-")[-1]
+		else:
+			ver = recipes[recipe]
+
 		comps_recipes.append(
 		{
-			"@id": "http:yocto/" + recipe_layer[recipe] + "/" + recipe + "/" + recipes[recipe],
+			"@id": "http:yocto/" + recipe_layer[recipe] + "/" + recipe + "/" + ver,
 			"@type": "Component",
 			"externalIdentifier": {
 			"externalSystemTypeId": "@yocto",
-			"externalId": recipe_layer[recipe] + "/" + recipe + "/" + recipes[recipe],
+			"externalId": recipe_layer[recipe] + "/" + recipe + "/" + ver,
 			"externalIdMetaData": {
 			"forge": {
 				"name": "yocto",
@@ -351,7 +362,7 @@ def proc_recipes():
 			},
 			"pieces": [
 				recipe,
-				recipes[recipe]
+				ver
 			],
 			"prefix": recipe_layer[recipe]
 		      }
@@ -537,6 +548,7 @@ def wait_for_bom_completion(ver):
 
 def wait_for_scans(ver):
 	global hub
+
 	links = ver['_meta']['links']
 	link = next((item for item in links if item["rel"] == "codelocations"), None)
 
@@ -565,6 +577,7 @@ if args.cve_check_file != "" and not args.no_cve_check:
 	hub = HubInstance()
 
 	print("Waiting for scan completion before continuing ...")
+	time.sleep(15)
 
 	try:
 		ver = hub.get_project_version_by_name(args.project, args.version)
