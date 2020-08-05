@@ -11,7 +11,7 @@ import time
 from blackduck.HubRestApi import HubInstance
 
 u = uuid.uuid1()
-print("Yocto build manifest import into Black Duck Utility v1.2")
+print("Yocto build manifest import into Black Duck Utility v1.3")
 print("--------------------------------------------------------\n")
 
 parser = argparse.ArgumentParser(description='Import Yocto build manifest to BD project version', prog='import_yocto_bm')
@@ -256,7 +256,8 @@ def proc_layers_in_recipes():
 					layer = arr[0]
 					ver = arr[1]
 					recipe_layer[rec] = layer
-					recipes[rec] = ver
+					if rec in recipes.keys():
+						recipes[rec] = ver
 					if layer not in layers:
 						layers.append(layer)
 				rec = ""
@@ -302,7 +303,7 @@ def proc_layers():
 		for recipe in recipes.keys():
 			if recipe_layer[recipe] == layer:
 				if recipes[recipe].find("+gitAUTOINC") != -1:
-					ver = recipes[recipe].split("+")[0] + "+GitX-" + recipes[recipe].split("-")[-1]
+					ver = recipes[recipe].split("+")[0] + "+gitX-" + recipes[recipe].split("-")[-1]
 				else:
 					ver = recipes[recipe]
 					
@@ -343,7 +344,7 @@ def proc_recipes():
 	print("- Processing recipes: ...")
 	for recipe in recipes.keys():
 		if recipes[recipe].find("+gitAUTOINC") != -1:
-			ver = recipes[recipe].split("+")[0] + "+GitX-" + recipes[recipe].split("-")[-1]
+			ver = recipes[recipe].split("+")[0] + "+gitX-" + recipes[recipe].split("-")[-1]
 		else:
 			ver = recipes[recipe]
 
@@ -473,7 +474,7 @@ if not args.cve_check_only:
 
 	print("\nUploading scan to Black Duck server ...")
 	if upload_json(args.output_json):
-		print("Scan file uploaded successfully\n")
+		print("Scan file uploaded successfully\nBlack Duck project '{}/{}' created.\n".format(args.project, args.version))
 	else:
 		print("ERROR: Unable to upload scan file")
 		sys.exit(3)
@@ -576,7 +577,8 @@ def wait_for_scans(ver):
 if args.cve_check_file != "" and not args.no_cve_check:
 	hub = HubInstance()
 
-	print("Waiting for scan completion before continuing ...")
+	print("Waiting for Black Duck server scan completion before continuing ...")
+	# Need to wait for scan to process into queue - sleep 15
 	time.sleep(15)
 
 	try:
@@ -595,9 +597,14 @@ if args.cve_check_file != "" and not args.no_cve_check:
 
 	print("\nLoading CVEs from cve_check log ...")
 
-	cvefile = open(args.cve_check_file, "r")
-	cvelines = cvefile.readlines()
-	cvefile.close()
+	try:
+		cvefile = open(args.cve_check_file, "r")
+		cvelines = cvefile.readlines()
+		cvefile.close()
+	except Exception as e:
+		print("ERROR: Unable to open CVE check output file\n" + str(e))
+		sys.exit(3)
+		
 	patched_vulns = []
 	pkgvuln = {}
 	cves_in_bm = 0
@@ -620,8 +627,8 @@ if args.cve_check_file != "" and not args.no_cve_check:
 						cves_in_bm += 1
 				pkgvuln = {}
 
-	print("CVEs identified from cve_check file:")
+	print("CVEs identified from cve_check output:")
 	print("- {} Patched CVEs total".format(len(patched_vulns)))
-	print("- {} Patched CVEs within packages in manifest".format(cves_in_bm))
+	print("- {} Patched CVEs within packages in build manifest (including mismatched CVEs with CPE version '-' which should be ignored)".format(cves_in_bm))
 	if len(patched_vulns) > 0:
 		process_patched_cves(patched_vulns)
