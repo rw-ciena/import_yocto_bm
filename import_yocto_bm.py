@@ -301,7 +301,7 @@ def proc_layers():
 		)
 		layer_rel = []
 		for recipe in recipes.keys():
-			if recipe_layer[recipe] == layer:
+			if recipe in recipe_layer.keys() and recipe_layer[recipe] == layer:
 				if recipes[recipe].find("+gitAUTOINC") != -1:
 					ver = recipes[recipe].split("+")[0] + "+gitX-" + recipes[recipe].split("-")[-1]
 				else:
