@@ -348,28 +348,29 @@ def proc_recipes():
 		else:
 			ver = recipes[recipe]
 
-		comps_recipes.append(
-		{
-			"@id": "http:yocto/" + recipe_layer[recipe] + "/" + recipe + "/" + ver,
-			"@type": "Component",
-			"externalIdentifier": {
-			"externalSystemTypeId": "@yocto",
-			"externalId": recipe_layer[recipe] + "/" + recipe + "/" + ver,
-			"externalIdMetaData": {
-			"forge": {
-				"name": "yocto",
-				"separator": "/",
-				"usePreferredNamespaceAlias": True
-			},
-			"pieces": [
-				recipe,
-				ver
-			],
-			"prefix": recipe_layer[recipe]
-		      }
-		    },
-		    "relationship": []
-		  })
+		if recipe in recipe_layer.keys():
+			comps_recipes.append(
+			{
+				"@id": "http:yocto/" + recipe_layer[recipe] + "/" + recipe + "/" + ver,
+				"@type": "Component",
+				"externalIdentifier": {
+				"externalSystemTypeId": "@yocto",
+				"externalId": recipe_layer[recipe] + "/" + recipe + "/" + ver,
+				"externalIdMetaData": {
+				"forge": {
+					"name": "yocto",
+					"separator": "/",
+					"usePreferredNamespaceAlias": True
+				},
+				"pieces": [
+					recipe,
+					ver
+				],
+				"prefix": recipe_layer[recipe]
+			      }
+			    },
+			    "relationship": []
+			  })
 
 def write_bdio(bdio):
 	global args
