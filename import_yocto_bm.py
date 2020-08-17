@@ -11,7 +11,7 @@ import time
 from blackduck.HubRestApi import HubInstance
 
 u = uuid.uuid1()
-print("Yocto build manifest import into Black Duck Utility v1.3")
+print("Yocto build manifest import into Black Duck Utility v1.4")
 print("--------------------------------------------------------\n")
 
 parser = argparse.ArgumentParser(description='Import Yocto build manifest to BD project version', prog='import_yocto_bm')
@@ -232,7 +232,7 @@ def proc_license_manifest(liclines):
 				entries += 1
 				if not value in recipes.keys():
 					recipes[value] = ver
-	print("- Identified {} recipes from {} packages".format(len(recipes), entries))
+	print("	Identified {} recipes from {} packages".format(len(recipes), entries))
 
 recipe_layer = {}
 layers = []
@@ -263,7 +263,7 @@ def proc_layers_in_recipes():
 				rec = ""
 		elif line.find("=== Matching recipes: ===") != -1:
 			start = True
-	print("- Discovered {} layers".format(len(layers)))
+	print("		Discovered {} layers".format(len(layers)))
 
 def proc_recipe_revisions():
 	global licdir, recipes
@@ -420,7 +420,7 @@ if not args.cve_check_only:
 		print('ERROR: Unable to read license.manifest file {} \n'.format(args.manifest) + str(e))
 		sys.exit(3)
 
-	print("\nProcessing:")
+	print("\nProcessing Bitbake project:")
 	proc_license_manifest(liclines)
 	proc_layers_in_recipes()
 	proc_recipe_revisions()
@@ -475,50 +475,68 @@ if not args.cve_check_only:
 
 	print("\nUploading scan to Black Duck server ...")
 	if upload_json(args.output_json):
-		print("Scan file uploaded successfully\nBlack Duck project '{}/{}' created.\n".format(args.project, args.version))
+		print("Scan file uploaded successfully\nBlack Duck project '{}/{}' created.".format(args.project, args.version))
 	else:
 		print("ERROR: Unable to upload scan file")
 		sys.exit(3)
 
-def process_patched_cves(vuln_list):
-	global args
-	hub = HubInstance()
+def patch_vuln(hub, comp):
+	status = "PATCHED"
+	comment = "Patched by bitbake recipe"
 
 	try:
-		project = hub.get_project_by_name(args.project)
+		vuln_name = comp['vulnerabilityWithRemediation']['vulnerabilityName']
 
-		version = hub.get_version_by_name(project, args.version)
+		comp['remediationStatus'] = status
+		comp['remediationComment'] = comment
+		result = hub.execute_put(comp['_meta']['href'], data=comp)
+		if result.status_code != 202:
+			return(False)
 
+	except Exception as e:
+		print("ERROR: Unable to update vulnerabilities via API\n" + str(e))
+		return(False)
+
+	return(True)
+
+def process_patched_cves(hub, version, vuln_list):
+	global args
+
+	try:
 		vulnerable_components_url = hub.get_link(version, "vulnerable-components") + "?limit=9999"
 		custom_headers = {'Accept':'application/vnd.blackducksoftware.bill-of-materials-6+json'}
 		response = hub.execute_get(vulnerable_components_url, custom_headers=custom_headers)
 		vulnerable_bom_components = response.json().get('items', [])
 
+		count = 0
+
+		for comp in vulnerable_bom_components:
+			if comp['vulnerabilityWithRemediation']['source'] == "NVD":
+				if comp['vulnerabilityWithRemediation']['vulnerabilityName'] in vuln_list:
+					if patch_vuln(hub, comp):
+						print("		Patched {}".format(comp['vulnerabilityWithRemediation']['vulnerabilityName']))
+						count += 1
+			elif comp['vulnerabilityWithRemediation']['source'] == "BDSA":
+				vuln_url = hub.get_apibase() + "/vulnerabilities/" + comp['vulnerabilityWithRemediation']['vulnerabilityName']
+				custom_headers = {'Accept':'application/vnd.blackducksoftware.vulnerability-4+json'}
+				resp = hub.execute_get(vuln_url, custom_headers=custom_headers)
+				vuln = resp.json()
+				#print(json.dumps(vuln, indent=4))
+				for x in vuln['_meta']['links']:
+					if x['rel'] == 'related-vulnerability':
+						if x['label'] == 'NVD':
+							cve = x['href'].split("/")[-1]
+							if cve in vuln_list:
+								if patch_vuln(hub, comp):
+									print("		Patched " + vuln['name'] + ": " + cve)
+									count += 1
+
 	except Exception as e:
-		print("ERROR: Unable to extract vulnerabilities from project via API\n" + str(e))
-		return()
+		print("ERROR: Unable to get components from project via API\n" + str(e))
+		return(False)
 
-	status = "PATCHED"
-	comment = "Patched by bitbake recipe"
-
-	count = 0
-	try:
-		for vuln in vulnerable_bom_components:
-			vuln_name = vuln['vulnerabilityWithRemediation']['vulnerabilityName']
-
-			if vuln_name in vuln_list:
-				vuln['remediationStatus'] = status
-				vuln['remediationComment'] = comment
-				result = hub.execute_put(vuln['_meta']['href'], data=vuln)
-				if result.status_code == 202:
-					count += 1
-				#	print("Marked {} as patched".format(vuln_name))
-				#else:
-				#	print("Skipped {} (Component not in image)".format(vuln_name))
-
-		print("- {} CVEs marked as patched in project '{}/{}'".format(count, args.project, args.version))
-	except Exception as e:
-		print("ERROR: Unable to update vulnerabilities via API\n" + str(e))
+	print("- {} CVEs marked as patched in project '{}/{}'".format(count, args.project, args.version))
+	return(True)
 
 def wait_for_bom_completion(ver):
 	global hub
@@ -578,11 +596,15 @@ def wait_for_scans(ver):
 if args.cve_check_file != "" and not args.no_cve_check:
 	hub = HubInstance()
 
-	print("Waiting for Black Duck server scan completion before continuing ...")
-	# Need to wait for scan to process into queue - sleep 15
-	time.sleep(15)
+	print("\nProcessing CVEs ...")
+
+	if not args.cve_check_only:
+		print("Waiting for Black Duck server scan completion before continuing ...")
+		# Need to wait for scan to process into queue - sleep 15
+		time.sleep(15)
 
 	try:
+		print("- Reading Black Duck project ...")
 		ver = hub.get_project_version_by_name(args.project, args.version)
 	except Exception as e:
 		print("ERROR: Unable to get project version from API\n" + str(e))
@@ -596,7 +618,7 @@ if args.cve_check_file != "" and not args.no_cve_check:
 		print("ERROR: Unable to determine BOM status")
 		sys.exit(3)
 
-	print("\nLoading CVEs from cve_check log ...")
+	print("- Loading CVEs from cve_check log ...")
 
 	try:
 		cvefile = open(args.cve_check_file, "r")
@@ -628,8 +650,9 @@ if args.cve_check_file != "" and not args.no_cve_check:
 						cves_in_bm += 1
 				pkgvuln = {}
 
-	print("CVEs identified from cve_check output:")
-	print("- {} Patched CVEs total".format(len(patched_vulns)))
-	print("- {} Patched CVEs within packages in build manifest (including mismatched CVEs with CPE version '-' which should be ignored)".format(cves_in_bm))
+	print("      {} total patched CVEs identified".format(len(patched_vulns)))
+	if not args.cve_check_only:
+		print("      {} Patched CVEs within packages in build manifest (including potentially mismatched CVEs which should be ignored)".format(cves_in_bm))
 	if len(patched_vulns) > 0:
-		process_patched_cves(patched_vulns)
+		process_patched_cves(hub, ver, patched_vulns)
+print("Done")
