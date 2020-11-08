@@ -1,35 +1,3 @@
-import os, io
-import json
-import uuid
-import datetime
-import argparse
-import sys
-import platform
-import re
-import subprocess, shutil
-import time
-from blackduck.HubRestApi import HubInstance
-
-u = uuid.uuid1()
-print("Yocto build manifest import into Black Duck Utility v1.4")
-print("--------------------------------------------------------\n")
-
-parser = argparse.ArgumentParser(description='Import Yocto build manifest to BD project version', prog='import_yocto_bm')
-
-# parser.add_argument("projfolder", nargs="?", help="Yocto project folder to analyse", default=".")
-
-parser.add_argument("-p", "--project", help="Black Duck project to create (REQUIRED)", default="")
-parser.add_argument("-v", "--version", help="Black Duck project version to create (REQUIRED)", default="")
-parser.add_argument("-y", "--yocto_build_folder", help="Yocto build folder (required if CVE check required or manifest file not specified)", default=".")
-parser.add_argument("-o", "--output_json", help="Output JSON bom file for manual import to Black Duck (instead of uploading the scan automatically)", default="")
-parser.add_argument("-t", "--target", help="Yocto target (default core-poky-sato)", default="core-image-sato")
-parser.add_argument("-m", "--manifest", help="Input build license.manifest file (if not specified will be determined from conf files)", default="")
-parser.add_argument("--arch", help="Architecture (if not specified then will be determined from conf files)", default="")
-parser.add_argument("--cve_check_only", help="Only check for patched CVEs from cve_check and update existing project", action='store_true')
-parser.add_argument("--no_cve_check", help="Skip check for and update of patched CVEs", action='store_true')
-parser.add_argument("--cve_check_file", help="CVE check output file (if not specified will be determined from conf files)", default="")
-
-args = parser.parse_args()
 
 def check_args():
 	global args
@@ -99,18 +67,19 @@ def check_yocto_build_folder():
 	 		return(False)
 	return(True)
 
-licdir = ""
 def find_files():
 	global args, licdir
 
 	# Locate yocto files & folders
-	bbconf = os.path.join(args.yocto_build_folder, "..", "meta", "conf", "bitbake.conf")
-	if not os.path.isfile(bbconf):
-		print("ERROR: Cannot locate bitbake conf file {}".format(bbconf))
+	if args.buildconf == "":
+		args.buildconf = os.path.join(args.yocto_build_folder, "..", "meta", "conf", "bitbake.conf")
+	if not os.path.isfile(args.buildconf):
+		print("ERROR: Cannot locate bitbake conf file {}".format(args.buildconf))
 		return(False)
-	locconf = os.path.join(args.yocto_build_folder, "conf", "local.conf")
-	if not os.path.isfile(locconf):
-		print("ERROR: Cannot locate local bitbake conf file {}".format(locconf))
+	if args.localconf == "":
+		args.localconf = os.path.join(args.yocto_build_folder, "conf", "local.conf")
+	if not os.path.isfile(args.localconf):
+		print("ERROR: Cannot locate local bitbake conf file {}".format(args.localconf))
 		return(False)
 
 	import re
@@ -121,7 +90,7 @@ def find_files():
 	machine = ""
 
 	try:
-		c = open(bbconf, "r")
+		c = open(args.buildconf, "r")
 		for line in c:
 			if re.search('^TMPDIR ', line):
 				tmpdir = line.split()[2]
@@ -129,11 +98,11 @@ def find_files():
 				deploydir = line.split()[2]
 		c.close()
 	except Exception as e:
-		print("ERROR: Unable to read bitbake.conf file {}\n".format(bbconf) + str(e))
+		print("ERROR: Unable to read bitbake.conf file {}\n".format(args.buildconf) + str(e))
 		return(False)
 
 	try:
-		l = open(locconf, "r")
+		l = open(args.localconf, "r")
 		for line in l:
 			if re.search('^TMPDIR ', line):
 				tmpdir = line.split()[2]
@@ -143,7 +112,7 @@ def find_files():
 				machine = line.split()[2]
 		l.close()
 	except Exception as e:
-		print("ERROR: Unable to read local.conf file {}\n".format(locconf) + str(e))
+		print("ERROR: Unable to read local.conf file {}\n".format(args.localconf) + str(e))
 		return(False)
 
 	if tmpdir != "":
@@ -195,24 +164,6 @@ def find_files():
 
 	return(True)
 
-if args.manifest == "":
-	if not check_yocto_build_folder():
-		sys.exit(1)
-	elif os.path.isabs(args.yocto_build_folder):
-		print("Working on Yocto build folder '{}'\n".format(args.yocto_build_folder))
-	else:
-		print("Working on Yocto build folder '{}' (Absolute path '{}')\n".format(args.yocto_build_folder, os.path.abspath(args.yocto_build_folder)))
-
-if not check_args() or not check_env() or not find_files():
-	sys.exit(1)
-
-bdio = []
-proj = args.project
-ver = args.version
-comps_layers = []
-comps_recipes = []
-packages = []
-recipes = {}
 
 def proc_license_manifest(liclines):
 	global recipes, packages
@@ -234,8 +185,6 @@ def proc_license_manifest(liclines):
 					recipes[value] = ver
 	print("	Identified {} recipes from {} packages".format(len(recipes), entries))
 
-recipe_layer = {}
-layers = []
 def proc_layers_in_recipes():
 	global layers, recipe_layer
 
@@ -285,8 +234,6 @@ def proc_recipe_revisions():
 					rev = arr[1].strip()
 					recipes[recipe] += "-" + rev
 
-proj_rel = []
-comps_layers = []
 def proc_layers():
 	global proj_rel, comps_layers, layers, recipes, recipe_layer
 
@@ -337,7 +284,7 @@ def proc_layers():
 		    "relationship": layer_rel
 		})
 
-comps_recipes = []
+
 def proc_recipes():
 	global recipes, recipe_layer, comps_recipes
 
@@ -406,79 +353,6 @@ def upload_json(jsonfile):
 	else:
 		return(False)
 
-if not args.cve_check_only:
-	try:
-		i = open(args.manifest, "r")
-	except Exception as e:
-		print('ERROR: Unable to open input manifest file {}\n'.format(args.manifest) + str(e))
-		sys.exit(3)
-
-	try:
-		liclines = i.readlines()
-		i.close()
-	except Exception as e:
-		print('ERROR: Unable to read license.manifest file {} \n'.format(args.manifest) + str(e))
-		sys.exit(3)
-
-	print("\nProcessing Bitbake project:")
-	proc_license_manifest(liclines)
-	proc_layers_in_recipes()
-	proc_recipe_revisions()
-	proc_layers()
-	proc_recipes()
-
-	#proj_rel is for the project relationship (project to layers)
-
-	mytime = datetime.datetime.now()
-	bdio_header = {
-	    "specVersion": "1.1.0",
-	    "spdx:name": args.project + "/" + args.version + " yocto/bom",
-	    "creationInfo": {
-	      "spdx:creator": [
-		"Tool: Detect-6.3.0",
-		"Tool: IntegrationBdio-21.0.1"
-	      ],
-	      "spdx:created": mytime.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-	    },
-	    "@id": "uuid:" + str(u),
-	    "@type": "BillOfMaterials",
-	    "relationship": []
-	  }
-
-	bdio_project = {
-	    "name": args.project,
-	    "revision": args.version,
-	    "@id": "http:yocto/" + args.project + "/" + args.version,
-	    "@type": "Project",
-	    "externalIdentifier": {
-	      "externalSystemTypeId": "@yocto",
-	      "externalId": "yocto/" + args.project + "/" + args.version,
-	      "externalIdMetaData": {
-		"forge": {
-		  "name": "yocto",
-		  "separator": ":",
-		  "usePreferredNamespaceAlias": True
-		},
-		"pieces": [
-		  args.project,
-		  args.version
-		],
-		"prefix": ""
-	      }
-	    },
-	    "relationship": proj_rel
-	  }
-
-	bdio = [ bdio_header, bdio_project, comps_layers, comps_recipes ]
-	if not write_bdio(bdio):
-		sys.exit(3)
-
-	print("\nUploading scan to Black Duck server ...")
-	if upload_json(args.output_json):
-		print("Scan file uploaded successfully\nBlack Duck project '{}/{}' created.".format(args.project, args.version))
-	else:
-		print("ERROR: Unable to upload scan file")
-		sys.exit(3)
 
 def patch_vuln(hub, comp):
 	status = "PATCHED"
@@ -593,66 +467,206 @@ def wait_for_scans(ver):
 
 	return(not wait)
 
-if args.cve_check_file != "" and not args.no_cve_check:
-	hub = HubInstance()
+import os, io
+import json
+import uuid
+import datetime
+import argparse
+import sys
+import platform
+import re
+import subprocess, shutil
+import time
+from blackduck.HubRestApi import HubInstance
 
-	print("\nProcessing CVEs ...")
+parser = argparse.ArgumentParser(description='Import Yocto build manifest to BD project version', prog='import_yocto_bm')
+
+# parser.add_argument("projfolder", nargs="?", help="Yocto project folder to analyse", default=".")
+
+parser.add_argument("-p", "--project", help="Black Duck project to create (REQUIRED)", default="")
+parser.add_argument("-v", "--version", help="Black Duck project version to create (REQUIRED)", default="")
+parser.add_argument("-y", "--yocto_build_folder", help="Yocto build folder (required if CVE check required or manifest file not specified)", default=".")
+parser.add_argument("-o", "--output_json", help="Output JSON bom file for manual import to Black Duck (instead of uploading the scan automatically)", default="")
+parser.add_argument("-t", "--target", help="Yocto target (default core-poky-sato)", default="core-image-sato")
+parser.add_argument("-m", "--manifest", help="Input build license.manifest file (if not specified will be determined from conf files)", default="")
+parser.add_argument("-b", "--buildconf", help="Build config file (if not specified poky/meta/conf/bitbake.conf will be used)", default="")
+parser.add_argument("-l", "--localconf", help="Local config file (if not specified poky/build/conf/local.conf will be used)", default="")
+parser.add_argument("--arch", help="Architecture (if not specified then will be determined from conf files)", default="")
+parser.add_argument("--cve_check_only", help="Only check for patched CVEs from cve_check and update existing project", action='store_true')
+parser.add_argument("--no_cve_check", help="Skip check for and update of patched CVEs", action='store_true')
+parser.add_argument("--cve_check_file", help="CVE check output file (if not specified will be determined from conf files)", default="")
+
+args = parser.parse_args()
+
+def main():
+	global args
+	print("Yocto build manifest import into Black Duck Utility v1.4")
+	print("--------------------------------------------------------\n")
+
+	if not check_args() or not check_env() or not find_files():
+		sys.exit(1)
+	
+	if args.manifest == "":
+		if not check_yocto_build_folder():
+			sys.exit(1)
+		elif os.path.isabs(args.yocto_build_folder):
+			print("Working on Yocto build folder '{}'\n".format(args.yocto_build_folder))
+		else:
+			print("Working on Yocto build folder '{}' (Absolute path '{}')\n".format(args.yocto_build_folder, os.path.abspath(args.yocto_build_folder)))
+
+	bdio = []
+	proj = args.project
+	ver = args.version
+	comps_layers = []
+	comps_recipes = []
+	packages = []
+	recipes = {}
+	comps_recipes = []
+	recipe_layer = {}
+	layers = []
+	proj_rel = []
+	comps_layers = []
+
+	u = uuid.uuid1()
+	licdir = ""
 
 	if not args.cve_check_only:
-		print("Waiting for Black Duck server scan completion before continuing ...")
-		# Need to wait for scan to process into queue - sleep 15
-		time.sleep(15)
+		try:
+			i = open(args.manifest, "r")
+		except Exception as e:
+			print('ERROR: Unable to open input manifest file {}\n'.format(args.manifest) + str(e))
+			sys.exit(3)
 
-	try:
-		print("- Reading Black Duck project ...")
-		ver = hub.get_project_version_by_name(args.project, args.version)
-	except Exception as e:
-		print("ERROR: Unable to get project version from API\n" + str(e))
-		sys.exit(3)
+		try:
+			liclines = i.readlines()
+			i.close()
+		except Exception as e:
+			print('ERROR: Unable to read license.manifest file {} \n'.format(args.manifest) + str(e))
+			sys.exit(3)
 
-	if not wait_for_scans(ver):
-		print("ERROR: Unable to determine scan status")
-		sys.exit(3)
+		print("\nProcessing Bitbake project:")
+		proc_license_manifest(liclines)
+		proc_layers_in_recipes()
+		proc_recipe_revisions()
+		proc_layers()
+		proc_recipes()
 
-	if not wait_for_bom_completion(ver):
-		print("ERROR: Unable to determine BOM status")
-		sys.exit(3)
+		#proj_rel is for the project relationship (project to layers)
 
-	print("- Loading CVEs from cve_check log ...")
+		mytime = datetime.datetime.now()
+		bdio_header = {
+			"specVersion": "1.1.0",
+			"spdx:name": args.project + "/" + args.version + " yocto/bom",
+			"creationInfo": {
+			  "spdx:creator": [
+			"Tool: Detect-6.3.0",
+			"Tool: IntegrationBdio-21.0.1"
+			  ],
+			  "spdx:created": mytime.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+			},
+			"@id": "uuid:" + str(u),
+			"@type": "BillOfMaterials",
+			"relationship": []
+		  }
 
-	try:
-		cvefile = open(args.cve_check_file, "r")
-		cvelines = cvefile.readlines()
-		cvefile.close()
-	except Exception as e:
-		print("ERROR: Unable to open CVE check output file\n" + str(e))
-		sys.exit(3)
+		bdio_project = {
+			"name": args.project,
+			"revision": args.version,
+			"@id": "http:yocto/" + args.project + "/" + args.version,
+			"@type": "Project",
+			"externalIdentifier": {
+			  "externalSystemTypeId": "@yocto",
+			  "externalId": "yocto/" + args.project + "/" + args.version,
+			  "externalIdMetaData": {
+			"forge": {
+			  "name": "yocto",
+			  "separator": ":",
+			  "usePreferredNamespaceAlias": True
+			},
+			"pieces": [
+			  args.project,
+			  args.version
+			],
+			"prefix": ""
+			  }
+			},
+			"relationship": proj_rel
+		  }
+
+		bdio = [ bdio_header, bdio_project, comps_layers, comps_recipes ]
+		if not write_bdio(bdio):
+			sys.exit(3)
+
+		print("\nUploading scan to Black Duck server ...")
+		if upload_json(args.output_json):
+			print("Scan file uploaded successfully\nBlack Duck project '{}/{}' created.".format(args.project, args.version))
+		else:
+			print("ERROR: Unable to upload scan file")
+			sys.exit(3)
+
+	if args.cve_check_file != "" and not args.no_cve_check:
+		hub = HubInstance()
+
+		print("\nProcessing CVEs ...")
+
+		if not args.cve_check_only:
+			print("Waiting for Black Duck server scan completion before continuing ...")
+			# Need to wait for scan to process into queue - sleep 15
+			time.sleep(15)
+
+		try:
+			print("- Reading Black Duck project ...")
+			ver = hub.get_project_version_by_name(args.project, args.version)
+		except Exception as e:
+			print("ERROR: Unable to get project version from API\n" + str(e))
+			sys.exit(3)
+
+		if not wait_for_scans(ver):
+			print("ERROR: Unable to determine scan status")
+			sys.exit(3)
+
+		if not wait_for_bom_completion(ver):
+			print("ERROR: Unable to determine BOM status")
+			sys.exit(3)
+
+		print("- Loading CVEs from cve_check log ...")
+
+		try:
+			cvefile = open(args.cve_check_file, "r")
+			cvelines = cvefile.readlines()
+			cvefile.close()
+		except Exception as e:
+			print("ERROR: Unable to open CVE check output file\n" + str(e))
+			sys.exit(3)
 		
-	patched_vulns = []
-	pkgvuln = {}
-	cves_in_bm = 0
-	for line in cvelines:
-		arr = line.split(":")
-		if len(arr) > 1:
-			key = arr[0]
-			value = arr[1].strip()
-			if key == "PACKAGE NAME":
-				pkgvuln['package'] = value
-			elif key == "PACKAGE VERSION":
-				pkgvuln['version'] = value
-			elif key == "CVE":
-				pkgvuln['CVE'] = value
-			elif key == "CVE STATUS":
-				pkgvuln['status'] = value
-				if pkgvuln['status'] == "Patched":
-					patched_vulns.append(pkgvuln['CVE'])
-					if pkgvuln['package'] in packages:
-						cves_in_bm += 1
-				pkgvuln = {}
+		patched_vulns = []
+		pkgvuln = {}
+		cves_in_bm = 0
+		for line in cvelines:
+			arr = line.split(":")
+			if len(arr) > 1:
+				key = arr[0]
+				value = arr[1].strip()
+				if key == "PACKAGE NAME":
+					pkgvuln['package'] = value
+				elif key == "PACKAGE VERSION":
+					pkgvuln['version'] = value
+				elif key == "CVE":
+					pkgvuln['CVE'] = value
+				elif key == "CVE STATUS":
+					pkgvuln['status'] = value
+					if pkgvuln['status'] == "Patched":
+						patched_vulns.append(pkgvuln['CVE'])
+						if pkgvuln['package'] in packages:
+							cves_in_bm += 1
+					pkgvuln = {}
 
-	print("      {} total patched CVEs identified".format(len(patched_vulns)))
-	if not args.cve_check_only:
-		print("      {} Patched CVEs within packages in build manifest (including potentially mismatched CVEs which should be ignored)".format(cves_in_bm))
-	if len(patched_vulns) > 0:
-		process_patched_cves(hub, ver, patched_vulns)
-print("Done")
+		print("      {} total patched CVEs identified".format(len(patched_vulns)))
+		if not args.cve_check_only:
+			print("      {} Patched CVEs within packages in build manifest (including potentially mismatched CVEs which should be ignored)".format(cves_in_bm))
+		if len(patched_vulns) > 0:
+			process_patched_cves(hub, ver, patched_vulns)
+	print("Done")
+
+if __name__ == "__main__":
+    main()
