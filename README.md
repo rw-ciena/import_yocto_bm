@@ -29,6 +29,8 @@ OSS components from OpenEmbedded recipes maintained at layers.openbedded.org sho
 
 1. Python 3 must be installed.
 
+1. Black Duck API package must be installed using `pip3 install blackduck`.
+
 1. An API key for the Black Duck server must be configured in the `.restconfig.json` file in the script invocation folder.
 
 1. A supported Yocto environment (version 2.0 to 3.1) must be loaded to the current shell (see [Preconfiguration](#PRECONFIGURATION) section below).
@@ -42,10 +44,6 @@ OSS components from OpenEmbedded recipes maintained at layers.openbedded.org sho
 Then use the Yocto build command (e.g. `bitbake core-image-sato` which will incrementally build without needing to rerun the full build, but will add the CVE check action to generate the log files.
 
 # INSTALLATION
-
-To install as a package use the following command:
-
-    python3 -m pip install --index-url https://test.pypi.org/simple/ --no-deps import-yocto-bm-matthewb66
 
 To download the script, change to a chosen location and use Git to download a copy of the project:
 
@@ -138,27 +136,22 @@ Check the [Preconfiguration](#PRECONFIGURATION) section above before running the
 
 Use the following command to scan a Yocto build, create Black Duck project `myproject` and version `v1.0`, then update CVE patch status for identified CVEs:
 
-    (If package installed) python3 -m import_yocto_bm -p myproject -v v1.0 
     (If script installed) python3 $YOCTO_BM_LOC/import_yocto_bm.py -p myproject -v v1.0
 
 To scan a Yocto project specifying a different build manifest as opposed to the most recent one:
 
-    (Package installed) python3 -m import_yocto_bm -p myproject -v v1.0 -m tmp/deploy/licenses/core-image-sato-qemux86-64-20200728105751/package.manifest
     (Script installed) python3 $YOCTO_BM_LOC/import_yocto_bm.py -p myproject -v v1.0 -m tmp/deploy/licenses/core-image-sato-qemux86-64-20200728105751/package.manifest
 
 To scan the most recent Yocto build in a different build folder location (not the current folder):
 
-    (Package installed) python3 -m import_yocto_bm -p myproject -v v1.0 --y $HOME/newyocto/poky/build
     (Script installed) python3 $YOCTO_BM_LOC/import_yocto_bm.py -p myproject -v v1.0 --y $HOME/newyocto/poky/build
 
 To perform a CVE check patch analysis only use the command:
 
-    (Package installed) python3 -m import_yocto_bm -p myproject -v v1.0 --cve_check_only
     (Script installed) python3 $YOCTO_BM_LOC/import_yocto_bm.py -p myproject -v v1.0 --cve_check_only
 
 To create a JSON output scan without uploading (and no CVE patch update) use:
 
-    (Package installed) python3 -m import_yocto_bm -p myproject -v v1.0 -o my.jsonld
     (Script installed) python3 $YOCTO_BM_LOC/import_yocto_bm.py -p myproject -v v1.0 -o my.jsonld
 
 # CVEs from cve_check Versus Black Duck
