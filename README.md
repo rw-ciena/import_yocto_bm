@@ -11,11 +11,13 @@ The `import_yocto_bm.py` script is designed to import a Yocto project build mani
 
 It can be used as an alternative to the standard Yocto scan process for Black Duck provided within Synopsys Detect.
 
-# YOCTO SCANNING IN BLACK DUCK
+# DEFAULT YOCTO SCANNING IN BLACK DUCK
 
 The default Yocto scan process for Black Duck is to determine Bitbake dependencies using Synopsys Detect (see [Synopsys Detect - scanning Yocto](https://synopsys.atlassian.net/wiki/spaces/INTDOCS/pages/631276245/Package+Managers+Supported+by+Detect)).
 
-This method calls Bitbake to report the project layers and recipes, checking against the recipes reported at OpenEmbedded.org (refer to [layers.openembedded.org](http://layers.openembedded.org/) to identify layers and recipes which will be mapped) and creating a Black Duck project containing the mapped components. Recipes in layers not reported at OpenEmbedded.org will not be imported into Black Duck, and you should consider using other Black Duck scan techniques to identify OSS within specific custom recipes referenced in the build. Note also that moving original OSS recipes to new layers will also stop them being reported.
+You should NOT use Black Duck Signature scanning for whole Yocto projects (except for custom recipes which may contain OSS which you want to identify). Signature scanning will not function accurately on Yocto projects because the code is modified locally by change/diff files and no reference copy of the changed code is available, meaning that Signature matching will not be able to determine the correct Yocto modified OSS components). Yocto projects are also very large and Signature scanning can consume large volumes of server resources without providing accurate matching.
+
+In this mode, Synopsys Detect calls Bitbake to report the project layers and recipes, checking against the recipes reported at OpenEmbedded.org (refer to [layers.openembedded.org](http://layers.openembedded.org/) to identify layers and recipes which will be mapped) and creating a Black Duck project containing the mapped components. Recipes in layers not reported at OpenEmbedded.org will not be imported into Black Duck, and you should consider using other Black Duck scan techniques to identify OSS within specific custom recipes referenced in the build. Note also that moving original OSS recipes to new layers will also stop them being reported.
 
 The resulting project will contain all mapped recipes/layers including those used to create the image but which may not delivered in the built image.
 
