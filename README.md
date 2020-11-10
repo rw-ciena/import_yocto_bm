@@ -1,14 +1,33 @@
 # Synopsys Import Yocto Build Manifest - import_yocto_bm.py
 
-# OVERVIEW
+# INTRODUCTION
 This script is provided under an OSS license as an example of how to use the Black Duck APIs to import components from a Yocto project manifest.
 
 It does not represent any extension of licensed functionality of Synopsys software itself and is provided as-is, without warranty or liability.
 
-# DESCRIPTION
+# OVERVIEW
 
 The `import_yocto_bm.py` script is designed to import a Yocto project build manifest created by Bitbake. It replaces previous scripts (including https://github.com/matthewb66/import_yocto_build_manifest).
 
+It can be used as an alternative to the standard Yocto scan process for Black Duck provided within Synopsys Detect.
+
+# YOCTO SCANNING IN BLACK DUCK
+
+The default Yocto scan process for Black Duck is to scan Bitbake dependencies using Synopsys Detect (see [Yocto in Synopsys Detect](https://synopsys.atlassian.net/wiki/spaces/INTDOCS/pages/631276245/Package+Managers+Supported+by+Detect).
+
+This method uses bitbake to report the project layers and recipes, checking against the recipes reported at OpenEbmedded.org and creating a Black Duck project containing the mapped components.
+
+The resulting project will contain all recipes/layers including those used to create the image but which may not delivered in the built image.
+
+To perform a Yocto scan using Synopsys Detect:
+- Change to the poky folder of a Yocto project
+- Run Synopsys Detect adding the options `--detect.tools=DETECTOR --detect.bitbake.package.names=core-image-sato`  (where `core-image-sato` is the package name).
+
+# WHY THIS SCRIPT
+
+This script operates on a built Yocto project, identifying the build manifest containing __only the recipes which are within the built image__.
+
+Recipes/layers are checked against OpenEmbedded.org and those which match are added to the created Black Duck project.
 The script must be executed on a Linux workstation where Yocto has been installed and after a successful Bitbake build.
 
 If invoked in the Yocto build folder (or the build folder is manually specified using the -y option), then it will locate the build-manifest file automatically in the tmp/deploy hierarchy.
